@@ -1,0 +1,18 @@
+# Add this to your main docker-compose.yml services section:
+#
+#  landing:
+#    build:
+#      context: ./landing
+#    container_name: karkas-landing
+#    restart: unless-stopped
+#    ports:
+#      - "3001:3000"
+
+services:
+  landing:
+    build:
+      context: ./landing
+    container_name: karkas-landing
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
