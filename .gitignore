@@ -1,0 +1,27 @@
+# Runtime data
+artifacts/
+data/
+validator-keys/
+
+# Secrets
+.env
+config/values.env
+.env.local
+
+# Blockscout runtime
+blockscout/blockscout-db-data/
+blockscout/redis-data/
+blockscout/logs/
+blockscout/dets/
+
+# Node
+node_modules/
+faucet/node_modules/
+faucet/dist/
+site/node_modules/
+site/dist/
+faucet/data/
+
+# OS
+.DS_Store
+Thumbs.db
