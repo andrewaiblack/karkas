@@ -5,8 +5,8 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 config_dir="$root/config"
 out_dir="$root/artifacts"
 
-if [[ -x "$root/scripts/00-init-secrets.sh" ]]; then
-  "$root/scripts/00-init-secrets.sh"
+if [[ -f "$root/scripts/00-init-secrets.sh" ]]; then
+  bash "$root/scripts/00-init-secrets.sh"
 fi
 
 rm -rf "$out_dir"/*
