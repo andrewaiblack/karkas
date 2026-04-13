@@ -118,12 +118,19 @@ $pk = Normalize-Pk (Get-EnvLocal "FAUCET_PRIVATE_KEY")
 $mnemonic = Get-Export "EL_AND_CL_MNEMONIC"
 $premineAddrs = Get-Export "EL_PREMINE_ADDRS"
 
+if ($pk -eq "0xYOUR_FAUCET_WALLET_PRIVATE_KEY" -or $pk -eq "YOUR_FAUCET_WALLET_PRIVATE_KEY") {
+  $pk = ""
+}
+
 $needsPk = (-not $pk) -or (-not (Is-ValidPk $pk))
 $needsMnemonic = (-not $mnemonic) -or (-not (Is-Valid-Mnemonic $mnemonic))
 $needsPremine = (-not $premineAddrs)
 
 if ($needsPk -or $needsMnemonic -or $needsPremine) {
   $output = Run-WalletTool $pk $mnemonic
+  if (-not $output) {
+    throw "Failed to generate secrets. Check Docker access and placeholder values in .env.local.example."
+  }
   $newPk = ($output | Where-Object { $_ -like "PK=*" } | Select-Object -First 1) -replace "^PK=", ""
   $newAddr = ($output | Where-Object { $_ -like "ADDR=*" } | Select-Object -First 1) -replace "^ADDR=", ""
   $newMnemonic = ($output | Where-Object { $_ -like "MNEMONIC=*" } | Select-Object -First 1) -replace "^MNEMONIC=", ""
@@ -147,4 +154,3 @@ if ($needsPk -or $needsMnemonic -or $needsPremine) {
 if (-not (Get-EnvLocal "FAUCET_PRIVATE_KEY")) {
   throw "FAUCET_PRIVATE_KEY is still empty. Fill it in $envLocal"
 }
-

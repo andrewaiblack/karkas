@@ -158,6 +158,10 @@ pk="$(normalize_pk "$pk")"
 mnemonic="$(get_export EL_AND_CL_MNEMONIC)"
 premine_addrs="$(get_export EL_PREMINE_ADDRS)"
 
+if [[ "$pk" == "0xYOUR_FAUCET_WALLET_PRIVATE_KEY" || "$pk" == "YOUR_FAUCET_WALLET_PRIVATE_KEY" ]]; then
+  pk=""
+fi
+
 needs_pk=false
 needs_mnemonic=false
 needs_premine=false
@@ -174,6 +178,10 @@ fi
 
 if [[ "$needs_pk" == true || "$needs_mnemonic" == true || "$needs_premine" == true ]]; then
   output="$(run_wallet_tool "$pk" "$mnemonic")"
+  if [[ -z "$output" ]]; then
+    echo "Failed to generate secrets. Check Docker access and placeholder values in .env.local.example." >&2
+    exit 1
+  fi
   new_pk="$(echo "$output" | sed -n 's/^PK=//p' | head -n1)"
   new_addr="$(echo "$output" | sed -n 's/^ADDR=//p' | head -n1)"
   new_mnemonic="$(echo "$output" | sed -n 's/^MNEMONIC=//p' | head -n1)"
@@ -198,4 +206,3 @@ if [[ -z "$(get_env_local FAUCET_PRIVATE_KEY)" ]]; then
   echo "FAUCET_PRIVATE_KEY is still empty. Fill it in $env_local" >&2
   exit 1
 fi
-
