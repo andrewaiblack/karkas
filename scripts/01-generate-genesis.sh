@@ -5,6 +5,10 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 config_dir="$root/config"
 out_dir="$root/artifacts"
 
+if [[ -x "$root/scripts/00-init-secrets.sh" ]]; then
+  "$root/scripts/00-init-secrets.sh"
+fi
+
 rm -rf "$out_dir"/*
 mkdir -p "$out_dir/metadata" "$out_dir/jwt" "$out_dir/parsed"
 

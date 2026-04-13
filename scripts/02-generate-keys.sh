@@ -5,6 +5,10 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 values_path="$root/config/values.env"
 out_dir="$root/validator-keys"
 
+if [[ -x "$root/scripts/00-init-secrets.sh" ]]; then
+  "$root/scripts/00-init-secrets.sh"
+fi
+
 if [[ ! -f "$values_path" ]]; then
   echo "Missing $values_path" >&2
   exit 1

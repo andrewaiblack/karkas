@@ -38,25 +38,27 @@ sudo usermod -aG docker $USER && newgrp docker
 
 ## 3) Configure secrets
 
+You can do this manually **or** let the scripts generate everything on the server.
+
+### Option A: Auto-generate (recommended)
+Leave `config/values.env` and `.env.local` empty. The scripts will:
+- generate a fresh 24-word validator mnemonic
+- generate a faucet private key + address
+- premine that address
+- write secrets into `.env.local` (not committed)
+
+### Option B: Manual
 ```bash
 # Faucet private key
 cp .env.local.example .env.local
 nano .env.local   # set FAUCET_PRIVATE_KEY
 
-# Blockscout secrets
-cp blockscout/.env.local.example blockscout/.env.local
-nano blockscout/.env.local
-# Generate SECRET_KEY_BASE: openssl rand -hex 64
+# Set faucet premine address
+nano config/values.env
+# export EL_PREMINE_ADDRS='{"0xYOUR_FAUCET_ADDRESS":{"balance":"1000000000ETH"}}'
 ```
 
-## 4) Set faucet premine address
-
-Edit `config/values.env`:
-```bash
-export EL_PREMINE_ADDRS='{"0xYOUR_FAUCET_ADDRESS":{"balance":"1000000000ETH"}}'
-```
-
-## 5) Generate Genesis + Start
+## 4) Generate Genesis + Start
 
 ```bash
 chmod +x scripts/*.sh

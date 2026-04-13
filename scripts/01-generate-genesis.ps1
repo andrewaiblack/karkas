@@ -4,6 +4,10 @@ $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $configDir = Join-Path $root "config"
 $outDir = Join-Path $root "artifacts"
 
+if (Test-Path (Join-Path $root "scripts\\00-init-secrets.ps1")) {
+  & (Join-Path $root "scripts\\00-init-secrets.ps1")
+}
+
 function To-DockerPath([string]$path) {
   $full = (Resolve-Path $path).Path
   $drive = $full.Substring(0,1).ToLower()
