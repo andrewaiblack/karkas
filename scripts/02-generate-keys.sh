@@ -1,56 +1,42 @@
 #!/usr/bin/env bash
+# =============================================================================
+#  02-generate-keys.sh — Generate validator keystores from mnemonic in .env
+# =============================================================================
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-values_path="$root/config/values.env"
-out_dir="$root/validator-keys"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="$ROOT/.env"
+OUT_DIR="$ROOT/validator-keys"
 
-if [[ -x "$root/scripts/00-init-secrets.sh" ]]; then
-  "$root/scripts/00-init-secrets.sh"
-fi
+die() { echo "ERROR: $*" >&2; exit 1; }
 
-if [[ ! -f "$values_path" ]]; then
-  echo "Missing $values_path" >&2
-  exit 1
-fi
+[[ -x "$ROOT/scripts/00-init-secrets.sh" ]] && "$ROOT/scripts/00-init-secrets.sh"
 
-get_env_value() {
+# Read mnemonic and count from .env
+read_env() {
   local key="$1"
-  local line
-  line="$(grep -E "^\s*export\s+$key=" "$values_path" | tail -n1 || true)"
-  if [[ -z "$line" ]]; then
-    echo ""
-    return
-  fi
-  line="${line#export $key=}"
-  line="${line%\"}"
-  line="${line#\"}"
-  echo "$line"
+  grep -E "^[[:space:]]*${key}=" "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2-
 }
 
-mnemonic="$(get_env_value EL_AND_CL_MNEMONIC)"
-count="$(get_env_value NUMBER_OF_VALIDATORS)"
+MNEMONIC="$(read_env VALIDATOR_MNEMONIC)"
+COUNT="$(read_env NUMBER_OF_VALIDATORS)"
 
-if [[ -z "$mnemonic" ]]; then
-  echo "EL_AND_CL_MNEMONIC not found in values.env" >&2
-  exit 1
-fi
-if [[ -z "$count" ]]; then
-  echo "NUMBER_OF_VALIDATORS not found in values.env" >&2
-  exit 1
-fi
+[[ -z "$MNEMONIC" ]] && die "VALIDATOR_MNEMONIC not set. Run 00-init-secrets.sh first."
+[[ -z "$COUNT" ]]    && die "NUMBER_OF_VALIDATORS not set in .env."
 
-rm -rf "$out_dir"
-mkdir -p "$out_dir"
+rm -rf "$OUT_DIR"
+mkdir -p "$OUT_DIR"
 
-echo "Generating $count validator keystores..."
+echo "Generating $COUNT validator keystores..."
 docker run --rm \
-  -v "$out_dir:/out" \
+  -v "$OUT_DIR:/out" \
   --entrypoint /usr/local/bin/eth2-val-tools \
   ethpandaops/ethereum-genesis-generator:master \
   keystores \
-  --source-mnemonic="$mnemonic" \
+  --source-mnemonic="$MNEMONIC" \
   --source-min=0 \
-  --source-max="$count" \
+  --source-max="$COUNT" \
   --out-loc /out/assigned_data \
   --insecure
+
+echo "OK  Validator keystores written to $OUT_DIR"

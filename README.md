@@ -1,95 +1,123 @@
 # PoS EVM L1 Testnet (Geth + Lighthouse)
 
-This is a full local PoS L1 testnet with EVM. Execution Layer = Geth, Consensus/Validator = Lighthouse. Genesis is generated with `ethereum-genesis-generator`, and validator keys are generated with `eth2-val-tools`.
+Full Proof-of-Stake EVM testnet — Execution Layer = Geth, Consensus/Validator = Lighthouse.
 
-## Quick Start (single machine)
+## Quick Start
 
-0. Generate secrets (mnemonic + faucet key):
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/00-init-secrets.ps1
+### 1. Edit `network.config`
+
+Open `network.config` and adjust the settings you need:
+
+```
+NETWORK_NAME=karkas        # name shown in Blockscout / config
+CHAIN_ID=144411            # EVM chain ID (pick something unique)
+CURRENCY_SYMBOL=KRKS       # token symbol
+BASE_DOMAIN=localhost      # your domain (or localhost for local use)
+RPC_URL=http://localhost:8545
+EXPLORER_URL=http://localhost:4000
+
+# Ports
+EXECUTION_HTTP_PORT=8545
+EXECUTION_WS_PORT=8546
+FAUCET_PORT=5000
+...
+```
+
+That file is the **only** place you configure the network. Everything else reads from it.
+
+### 2. Generate all secrets
+
+```bash
+bash scripts/00-init-secrets.sh
+```
+
+This generates and saves to `.env` (gitignored):
+- Validator BIP-39 mnemonic
+- Faucet private key + Ethereum address
+- JWT secret (for EL ↔ CL authentication)
+- Blockscout DB password + secret key base
+
+Safe to re-run — existing values are never overwritten.
+
+### 3. Generate genesis
+
+```bash
+bash scripts/01-generate-genesis.sh
+```
+
+Renders config templates with your values, then runs `ethereum-genesis-generator` to produce all artifacts in `artifacts/`.
+
+### 4. Generate validator keys
+
+```bash
+bash scripts/02-generate-keys.sh
+```
+
+### 5. Initialise Geth
+
+```bash
+bash scripts/03-init-geth.sh
+```
+
+### 6. Copy validator keys
+
+```bash
+bash scripts/04-init-validator.sh
+```
+
+### 7. Start the stack
+
+```bash
+docker compose up -d
+```
+
+### 8. Start Blockscout (optional)
+
+```bash
+cd blockscout
+docker compose --env-file ../.env up -d
+```
+
+---
+
+## Architecture
+
+```
+network.config          ← single source of truth for all settings
+  ↓
+00-init-secrets.sh      ← generates secrets, writes .env
+  ↓
+.env                    ← all config + secrets (gitignored)
+  ↓
+docker-compose.yml      ← reads .env only, no hardcoding
+blockscout/docker-compose.yml ← reads root .env via --env-file
+```
+
+## Adding More Validators
+
+1. Edit `NUMBER_OF_VALIDATORS` in `network.config`.
+2. Re-run secrets (idempotent), re-generate genesis, re-generate keys, restart.
+
+## Multi-Machine Setup
+
+1. On the seed server: start the stack, grab `enode://...` and `enr:...` from logs:
+   ```bash
+   docker logs l1-execution | grep enode
+   docker logs l1-consensus | grep enr
    ```
-1. Generate genesis + configs:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/01-generate-genesis.ps1
-   ```
-2. Generate validator keys:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/02-generate-keys.ps1
-   ```
-3. Initialize the geth datadir:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/03-init-geth.ps1
-   ```
-4. Copy validator keys into the datadir:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts/04-init-validator.ps1
-   ```
-5. Start the nodes:
-   ```powershell
-   docker compose up -d
-   ```
-
-## What appears in `artifacts/`
-
-The generator produces:
-
-1. `artifacts/metadata/genesis.json` (EL genesis)
-2. `artifacts/metadata/genesis.ssz` and `artifacts/metadata/config.yaml` (CL genesis + config)
-3. `artifacts/jwt/jwtsecret` (JWT secret for EL<->CL)
-4. `artifacts/metadata/deposit_contract.txt` (deposit contract address)
-
-## Add More Validators
-
-1. Generate extra keys (example indices 8..12):
-   ```powershell
-   docker run --rm -v "$PWD/validator-keys-extra:/out" `
-     --entrypoint /usr/local/bin/eth2-val-tools `
-     ethpandaops/ethereum-genesis-generator:master `
-     keystores `
-     --source-mnemonic="YOUR_MNEMONIC" `
-     --source-min=8 --source-max=12 `
-     --out-loc /out/assigned_data --insecure
-   ```
-2. Copy `validator-keys-extra/assigned_data/keys` into `data/validator/validators` and
-   `validator-keys-extra/assigned_data/secrets` into `data/validator/secrets`.
-3. Generate deposit-data for those validators:
-   ```powershell
-   docker run --rm ethpandaops/ethereum-genesis-generator:master `
-     eth2-val-tools deposit-data `
-     --validators-mnemonic="YOUR_MNEMONIC" `
-     --withdrawals-mnemonic="YOUR_MNEMONIC" `
-     --source-min=8 --source-max=12 `
-     --fork-version=0x10000000 `
-     --withdrawal-credentials-type=0x00
-   ```
-4. Send each deposit-data as a deposit transaction to the deposit contract.
-
-After deposits are included, validators activate and start earning rewards.
-
-## Second Machine (separate node/validator)
-
-1. On the seed server, start nodes and get `enode://...` and `enr:...` from logs:
-   ```powershell
-   docker logs l1-execution
-   docker logs l1-consensus
-   ```
-2. On the second machine, copy the same `artifacts/metadata` (genesis + config) from the seed machine, or regenerate with the exact same `config/values.env`.
-3. On the second machine, set in `.env`:
+2. On the second machine: copy `artifacts/metadata/` from the seed.
+3. Add to `.env` on the second machine:
    ```
    EL_BOOTNODES=enode://...
    CL_BOOTSTRAP_NODES=enr:...
    ```
-4. Repeat key generation and startup steps.
+4. Run steps 4–7 on the second machine.
 
-## Notes
+## Security Notes
 
-This project uses the official Docker images `ethereum/client-go` and `sigp/lighthouse`.
+- `.env` is chmod 600 and gitignored — never commit it.
+- The Consensus API port and metrics port are bound to `127.0.0.1` in docker-compose (not exposed publicly).
+- The faucet validates private key format at startup and never exposes error internals in production.
+- Blockscout DB password and `SECRET_KEY_BASE` are randomly generated per-deployment.
 
----
-
-If you want, I can add:
-1. A deposit automation script.
-2. Prometheus + Grafana.
-3. A full multi-node automation script.
-
-Server deployment guide (Cloudflare Tunnel, Blockscout, Faucet): see `DEPLOY_SERVER.md`.
+Server deployment guide (Cloudflare Tunnel, reverse proxy): see `DEPLOY_SERVER.md`.

@@ -1,167 +1,183 @@
 #!/usr/bin/env bash
+# =============================================================================
+#  00-init-secrets.sh
+#  Generates mnemonic, faucet wallet, JWT secret, Blockscout secrets and writes
+#  everything to .env (gitignored).  Safe to re-run: existing values are kept.
+# =============================================================================
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-env_path="$root/.env"
-env_local_path="$root/.env.local"
-values_path="$root/config/values.env"
-genesis_config="$root/config/el/genesis-config.yaml"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CFG="$ROOT/network.config"
+ENV_FILE="$ROOT/.env"
 
-default_mnemonic="sleep moment list remain like wall lake industry canvas wonder ecology elite duck salad naive syrup frame brass utility club odor country obey pudding"
+# ── helpers ──────────────────────────────────────────────────────────────────
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "Docker is required to generate secrets. Please install docker first." >&2
-  exit 1
-fi
+die() { echo "ERROR: $*" >&2; exit 1; }
 
-touch "$env_path"
-touch "$env_local_path"
-touch "$values_path"
+require_cmd() { command -v "$1" >/dev/null 2>&1 || die "$1 is required but not installed."; }
 
-escape_sed() {
-  printf '%s' "$1" | sed -e 's/[\\/&|]/\\&/g'
-}
-
-read_env_value() {
-  local file="$1"
-  local key="$2"
+# Load a key from network.config (plain KEY=VALUE lines)
+cfg() {
+  local key="$1"
   local line
-  line="$(grep -E "^[[:space:]]*${key}=" "$file" | tail -n1 || true)"
-  if [[ -z "$line" ]]; then
-    echo ""
-    return
-  fi
-  echo "${line#${key}=}"
+  line="$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$CFG" | tail -n1 || true)"
+  echo "${line#*=}" | xargs
 }
 
-read_export_value() {
-  local file="$1"
-  local key="$2"
+# Read a key from .env
+read_env() {
+  local key="$1"
   local line
-  line="$(grep -E "^[[:space:]]*export[[:space:]]+${key}=" "$file" | tail -n1 || true)"
-  if [[ -z "$line" ]]; then
-    echo ""
-    return
-  fi
-  line="${line#export ${key}=}"
-  line="${line#\"}"
-  line="${line%\"}"
-  echo "$line"
+  line="$(grep -E "^[[:space:]]*${key}=" "$ENV_FILE" 2>/dev/null | tail -n1 || true)"
+  [[ -z "$line" ]] && echo "" && return
+  echo "${line#*=}"
 }
 
+# Write or update KEY=VALUE in .env
 upsert_env() {
-  local file="$1"
-  local key="$2"
-  local value="$3"
+  local key="$1"
+  local value="$2"
   local escaped
-  escaped="$(escape_sed "$value")"
-  if grep -qE "^[[:space:]]*${key}=" "$file"; then
-    sed -i.bak "s|^[[:space:]]*${key}=.*|${key}=${escaped}|" "$file"
+  escaped="$(printf '%s' "$value" | sed 's/[\/&]/\\&/g')"
+  if grep -qE "^[[:space:]]*${key}=" "$ENV_FILE" 2>/dev/null; then
+    sed -i.bak "s|^[[:space:]]*${key}=.*|${key}=${escaped}|" "$ENV_FILE"
+    rm -f "$ENV_FILE.bak"
   else
-    printf '%s=%s\n' "$key" "$value" >> "$file"
+    printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
   fi
-  rm -f "$file.bak"
 }
 
-upsert_export() {
-  local file="$1"
-  local key="$2"
-  local value="$3"
-  local escaped
-  escaped="$(printf '%s' "$value" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
-  if grep -qE "^[[:space:]]*export[[:space:]]+${key}=" "$file"; then
-    sed -i.bak "s|^[[:space:]]*export[[:space:]]+${key}=.*|export ${key}=\"${escaped}\"|" "$file"
-  else
-    printf 'export %s="%s"\n' "$key" "$escaped" >> "$file"
-  fi
-  rm -f "$file.bak"
-}
+# ── preflight ────────────────────────────────────────────────────────────────
 
-generate_secrets() {
-  docker run --rm -e "FAUCET_KEY=${key}" node:20-alpine sh -lc "npm -s init -y >/dev/null && npm -s i ethers@6 >/dev/null && node - <<'NODE'
+require_cmd docker
+[[ -f "$CFG" ]] || die "network.config not found at $ROOT/network.config"
+
+touch "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+
+# ── copy all non-secret settings from network.config into .env ───────────────
+
+network_keys=(
+  NETWORK_NAME CHAIN_ID NETWORK_ID
+  CURRENCY_NAME CURRENCY_SYMBOL CURRENCY_DECIMALS
+  BASE_DOMAIN RPC_URL EXPLORER_URL
+  EXECUTION_HTTP_PORT EXECUTION_WS_PORT EXECUTION_P2P_PORT
+  CONSENSUS_HTTP_PORT CONSENSUS_P2P_TCP CONSENSUS_P2P_UDP CONSENSUS_METRICS_PORT
+  FAUCET_PORT LANDING_PORT BLOCKSCOUT_PORT
+  FAUCET_AMOUNT_WEI FAUCET_RATE_LIMIT_HOURS
+  DEPOSIT_CONTRACT_ADDRESS
+)
+
+for key in "${network_keys[@]}"; do
+  val="$(cfg "$key")"
+  [[ -n "$val" ]] && upsert_env "$key" "$val"
+done
+
+# ── generate secrets ─────────────────────────────────────────────────────────
+
+echo "── Checking secrets ──────────────────────────────────────────────────────"
+
+MNEMONIC="$(read_env VALIDATOR_MNEMONIC)"
+FAUCET_KEY="$(read_env FAUCET_PRIVATE_KEY)"
+FAUCET_ADDR="$(read_env FAUCET_ADDRESS)"
+JWT_SECRET="$(read_env JWT_SECRET)"
+BLOCKSCOUT_DB_PW="$(read_env BLOCKSCOUT_DB_PASSWORD)"
+BLOCKSCOUT_SK="$(read_env BLOCKSCOUT_SECRET_KEY_BASE)"
+
+needs_wallet=false
+[[ -z "$MNEMONIC" || -z "$FAUCET_KEY" || -z "$FAUCET_ADDR" ]] && needs_wallet=true
+
+if [[ "$needs_wallet" == "true" ]]; then
+  echo "Generating validator mnemonic + faucet wallet via Docker..."
+
+  wallet_output="$(docker run --rm node:20-alpine sh -c "
+    set -e
+    npm install --silent --no-save ethers@6 2>/dev/null
+    node --input-type=module <<'NODE'
 import { Wallet } from 'ethers';
 const validator = Wallet.createRandom();
 const faucet = Wallet.createRandom();
-console.log(\`VALIDATOR_MNEMONIC=\${validator.mnemonic.phrase}\`);
-console.log(\`FAUCET_PRIVATE_KEY=\${faucet.privateKey}\`);
-console.log(\`FAUCET_ADDRESS=\${faucet.address.toLowerCase()}\`);
-NODE"
-}
+process.stdout.write('VALIDATOR_MNEMONIC=' + validator.mnemonic.phrase + '\n');
+process.stdout.write('FAUCET_PRIVATE_KEY=' + faucet.privateKey + '\n');
+process.stdout.write('FAUCET_ADDRESS=' + faucet.address.toLowerCase() + '\n');
+NODE
+  ")"
 
-derive_address() {
-  local key="$1"
-  docker run --rm node:20-alpine sh -lc "npm -s init -y >/dev/null && npm -s i ethers@6 >/dev/null && node - <<'NODE'
-import { Wallet } from 'ethers';
-const key = process.env.FAUCET_KEY;
-const wallet = new Wallet(key);
-console.log(wallet.address.toLowerCase());
-NODE"
-}
+  MNEMONIC="$(printf '%s\n' "$wallet_output" | grep '^VALIDATOR_MNEMONIC=' | cut -d= -f2-)"
+  FAUCET_KEY="$(printf '%s\n' "$wallet_output" | grep '^FAUCET_PRIVATE_KEY=' | cut -d= -f2-)"
+  FAUCET_ADDR="$(printf '%s\n' "$wallet_output" | grep '^FAUCET_ADDRESS=' | cut -d= -f2-)"
 
-needs_mnemonic=false
-needs_faucet_key=false
+  [[ -z "$MNEMONIC" ]]    && die "Failed to generate validator mnemonic"
+  [[ -z "$FAUCET_KEY" ]]  && die "Failed to generate faucet private key"
+  [[ -z "$FAUCET_ADDR" ]] && die "Failed to derive faucet address"
 
-current_mnemonic="$(read_export_value "$values_path" "EL_AND_CL_MNEMONIC")"
-if [[ -z "$current_mnemonic" || "$current_mnemonic" == "$default_mnemonic" ]]; then
-  needs_mnemonic=true
+  upsert_env VALIDATOR_MNEMONIC "$MNEMONIC"
+  upsert_env FAUCET_PRIVATE_KEY "$FAUCET_KEY"
+  upsert_env FAUCET_ADDRESS     "$FAUCET_ADDR"
+  echo "  OK Validator mnemonic generated"
+  echo "  OK Faucet wallet: $FAUCET_ADDR"
+else
+  echo "  OK Wallet secrets already present -- skipping"
 fi
 
-current_faucet_key="$(read_env_value "$env_path" "FAUCET_PRIVATE_KEY")"
-if [[ -z "$current_faucet_key" ]]; then
-  current_faucet_key="$(read_env_value "$env_local_path" "FAUCET_PRIVATE_KEY")"
-fi
-if [[ -z "$current_faucet_key" ]]; then
-  needs_faucet_key=true
-fi
-
-validator_mnemonic="$current_mnemonic"
-faucet_private_key="$current_faucet_key"
-faucet_address="$(read_env_value "$env_path" "FAUCET_ADDRESS")"
-
-if [[ "$needs_mnemonic" == "true" || "$needs_faucet_key" == "true" ]]; then
-  echo "Generating secrets with docker..."
-  secrets="$(generate_secrets)"
-  if [[ "$needs_mnemonic" == "true" ]]; then
-    validator_mnemonic="$(printf '%s\n' "$secrets" | sed -n 's/^VALIDATOR_MNEMONIC=//p')"
+# JWT secret
+if [[ -z "$JWT_SECRET" ]]; then
+  echo "Generating JWT secret..."
+  if command -v openssl >/dev/null 2>&1; then
+    JWT_SECRET="$(openssl rand -hex 32)"
+  else
+    JWT_SECRET="$(dd if=/dev/urandom bs=32 count=1 2>/dev/null | xxd -p | tr -d '\n')"
   fi
-  if [[ "$needs_faucet_key" == "true" ]]; then
-    faucet_private_key="$(printf '%s\n' "$secrets" | sed -n 's/^FAUCET_PRIVATE_KEY=//p')"
-    faucet_address="$(printf '%s\n' "$secrets" | sed -n 's/^FAUCET_ADDRESS=//p')"
+  upsert_env JWT_SECRET "$JWT_SECRET"
+  echo "  OK JWT secret generated"
+else
+  echo "  OK JWT secret already present -- skipping"
+fi
+
+# Blockscout DB password
+if [[ -z "$BLOCKSCOUT_DB_PW" ]]; then
+  echo "Generating Blockscout DB password..."
+  if command -v openssl >/dev/null 2>&1; then
+    BLOCKSCOUT_DB_PW="$(openssl rand -base64 24 | tr -d '/+=' | head -c 32)"
+  else
+    BLOCKSCOUT_DB_PW="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)"
   fi
+  upsert_env BLOCKSCOUT_DB_PASSWORD "$BLOCKSCOUT_DB_PW"
+  echo "  OK Blockscout DB password generated"
+else
+  echo "  OK Blockscout DB password already present -- skipping"
 fi
 
-if [[ -z "$faucet_address" && -n "$faucet_private_key" ]]; then
-  echo "Deriving faucet address from existing private key..."
-  faucet_address="$(derive_address "$faucet_private_key")"
-fi
-
-if [[ -n "$validator_mnemonic" ]]; then
-  upsert_export "$values_path" "EL_AND_CL_MNEMONIC" "$validator_mnemonic"
-fi
-
-if [[ -n "$faucet_private_key" ]]; then
-  upsert_env "$env_path" "FAUCET_PRIVATE_KEY" "$faucet_private_key"
-  upsert_env "$env_local_path" "FAUCET_PRIVATE_KEY" "$faucet_private_key"
-fi
-
-if [[ -n "$faucet_address" ]]; then
-  upsert_env "$env_path" "FAUCET_ADDRESS" "$faucet_address"
-  upsert_export "$values_path" "WITHDRAWAL_ADDRESS" "$faucet_address"
-fi
-
-fee_recipient="$(read_env_value "$env_path" "FEE_RECIPIENT")"
-if [[ -n "$faucet_address" && ( -z "$fee_recipient" || "$fee_recipient" == "0x0000000000000000000000000000000000000000" ) ]]; then
-  upsert_env "$env_path" "FEE_RECIPIENT" "$faucet_address"
-fi
-
-if [[ -n "$faucet_address" && -f "$genesis_config" ]]; then
-  if grep -q "0xYOUR_FAUCET_ADDRESS" "$genesis_config"; then
-    sed -i.bak "s/0xYOUR_FAUCET_ADDRESS/$(escape_sed "$faucet_address")/" "$genesis_config"
-    rm -f "$genesis_config.bak"
-  elif grep -q "0x0000000000000000000000000000000000000000" "$genesis_config"; then
-    sed -i.bak "s/0x0000000000000000000000000000000000000000/$(escape_sed "$faucet_address")/" "$genesis_config"
-    rm -f "$genesis_config.bak"
+# Blockscout SECRET_KEY_BASE
+if [[ -z "$BLOCKSCOUT_SK" ]]; then
+  echo "Generating Blockscout secret key base..."
+  if command -v openssl >/dev/null 2>&1; then
+    BLOCKSCOUT_SK="$(openssl rand -hex 64)"
+  else
+    BLOCKSCOUT_SK="$(dd if=/dev/urandom bs=64 count=1 2>/dev/null | xxd -p | tr -d '\n')"
   fi
+  upsert_env BLOCKSCOUT_SECRET_KEY_BASE "$BLOCKSCOUT_SK"
+  echo "  OK Blockscout secret key base generated"
+else
+  echo "  OK Blockscout secret key base already present -- skipping"
 fi
 
-echo "Secrets ready."
+# Fee recipient
+FEE_RECIPIENT="$(read_env FEE_RECIPIENT)"
+if [[ -z "$FEE_RECIPIENT" || "$FEE_RECIPIENT" == "0x0000000000000000000000000000000000000000" ]]; then
+  upsert_env FEE_RECIPIENT "$FAUCET_ADDR"
+  echo "  OK FEE_RECIPIENT set to faucet address"
+fi
+
+# Withdrawal address
+WITHDRAWAL_ADDRESS="$(read_env WITHDRAWAL_ADDRESS)"
+if [[ -z "$WITHDRAWAL_ADDRESS" ]]; then
+  upsert_env WITHDRAWAL_ADDRESS "$FAUCET_ADDR"
+fi
+
+echo ""
+echo "Secrets ready. Values stored in .env (never commit this file)."
+echo ""
+echo "   Faucet address : $FAUCET_ADDR"
+echo "   Chain ID       : $(cfg CHAIN_ID)"
+echo ""

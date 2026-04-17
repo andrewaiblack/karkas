@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
+# =============================================================================
+#  03-init-geth.sh — Initialize the Geth data directory with the generated genesis
+# =============================================================================
 set -euo pipefail
 
-root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-genesis="$root/artifacts/metadata/genesis.json"
-datadir="$root/data/el"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GENESIS="$ROOT/artifacts/metadata/genesis.json"
+DATADIR="$ROOT/data/el"
 
-if [[ ! -f "$genesis" ]]; then
-  echo "Missing $genesis. Run scripts/01-generate-genesis.sh first." >&2
-  exit 1
-fi
+die() { echo "ERROR: $*" >&2; exit 1; }
 
-mkdir -p "$datadir"
+[[ -f "$GENESIS" ]] || die "Missing $GENESIS — run 01-generate-genesis.sh first."
+
+mkdir -p "$DATADIR"
 
 echo "Initializing geth datadir..."
 docker run --rm \
-  -v "$datadir:/data" \
-  -v "$genesis:/genesis.json" \
+  -v "$DATADIR:/data" \
+  -v "$GENESIS:/genesis.json:ro" \
   ethereum/client-go \
   init --datadir /data /genesis.json
+
+echo "OK  Geth initialized."
