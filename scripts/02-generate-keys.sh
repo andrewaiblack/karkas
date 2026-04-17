@@ -28,7 +28,9 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
 echo "Generating $COUNT validator keystores..."
+# --user ensures keystore files are owned by the current user, not root
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
   -v "$OUT_DIR:/out" \
   --entrypoint /usr/local/bin/eth2-val-tools \
   ethpandaops/ethereum-genesis-generator:master \

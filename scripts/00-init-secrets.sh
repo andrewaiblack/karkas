@@ -90,9 +90,9 @@ needs_wallet=false
 if [[ "$needs_wallet" == "true" ]]; then
   echo "Generating validator mnemonic + faucet wallet via Docker..."
 
-wallet_output="$(docker run --rm --dns 8.8.8.8 node:20-alpine sh -c "
+  wallet_output="$(docker run --rm node:20-alpine sh -c "
     set -e
-    npm install ethers@6
+    npm install --silent --no-save ethers@6 2>/dev/null
     node --input-type=module <<'NODE'
 import { Wallet } from 'ethers';
 const validator = Wallet.createRandom();

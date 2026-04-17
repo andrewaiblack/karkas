@@ -137,27 +137,33 @@ export GENESIS_TIMESTAMP
 # Use envsubst to substitute $VAR placeholders in config.yaml template
 envsubst < "$ROOT/config/cl/config.yaml" > "$RENDERED/cl/config.yaml"
 
-# ── run genesis generator ─────────────────────────────────────────────────────
+# ── prepare output dirs owned by current user BEFORE docker run ───────────────
+# This prevents Docker (running as root) from creating root-owned subdirs.
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR/metadata" "$OUT_DIR/jwt" "$OUT_DIR/parsed"
 
+# Write JWT secret NOW (before docker), so the file is owned by current user.
+JWT_SECRET="$(grep '^JWT_SECRET=' "$ENV_FILE" | cut -d= -f2-)"
+if [[ -n "$JWT_SECRET" ]]; then
+  printf '%s' "0x${JWT_SECRET#0x}" > "$OUT_DIR/jwt/jwtsecret"
+  echo "  OK JWT secret written to artifacts/jwt/jwtsecret"
+else
+  die "JWT_SECRET not found in .env — run 00-init-secrets.sh first."
+fi
+
+# ── run genesis generator ─────────────────────────────────────────────────────
+
 echo "Generating genesis (GENESIS_TIMESTAMP=$GENESIS_TIMESTAMP, CHAIN_ID=$CHAIN_ID)..."
 
+# --user ensures all files written by the container belong to the current user
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
   -v "$OUT_DIR:/data" \
   -v "$RENDERED:/config" \
   -e "GENESIS_TIMESTAMP=$GENESIS_TIMESTAMP" \
   ethpandaops/ethereum-genesis-generator:master \
   all
-
-# Write the JWT secret from .env into the jwt file so geth and lighthouse use it
-JWT_SECRET="$(grep '^JWT_SECRET=' "$ENV_FILE" | cut -d= -f2-)"
-if [[ -n "$JWT_SECRET" ]]; then
-  mkdir -p "$OUT_DIR/jwt"
-  printf '%s' "0x${JWT_SECRET#0x}" > "$OUT_DIR/jwt/jwtsecret"
-  echo "  OK JWT secret written to artifacts/jwt/jwtsecret"
-fi
 
 echo ""
 echo "Genesis artifacts written to $OUT_DIR"

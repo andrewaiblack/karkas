@@ -15,7 +15,9 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 mkdir -p "$DATADIR"
 
 echo "Initializing geth datadir..."
+# --user ensures geth writes chaindata as current user, not root
 docker run --rm \
+  --user "$(id -u):$(id -g)" \
   -v "$DATADIR:/data" \
   -v "$GENESIS:/genesis.json:ro" \
   ethereum/client-go \
