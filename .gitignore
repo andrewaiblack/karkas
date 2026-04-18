@@ -1,0 +1,27 @@
+# ── Runtime data ──────────────────────────────────────────────────────────────
+artifacts/
+data/
+validator-keys/
+.rendered-config/
+
+# ── Secrets  (NEVER commit these) ─────────────────────────────────────────────
+.env
+.env.local
+
+# ── Blockscout runtime ────────────────────────────────────────────────────────
+blockscout/blockscout-db-data/
+blockscout/redis-data/
+blockscout/logs/
+blockscout/dets/
+
+# ── Node / build ──────────────────────────────────────────────────────────────
+node_modules/
+faucet/node_modules/
+faucet/dist/
+faucet/data/
+site/node_modules/
+site/dist/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
