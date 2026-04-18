@@ -90,17 +90,13 @@ needs_wallet=false
 if [[ "$needs_wallet" == "true" ]]; then
   echo "Generating validator mnemonic + faucet wallet via Docker..."
 
+  JS_SCRIPT="import { Wallet } from 'ethers'; const v = Wallet.createRandom(); const f = Wallet.createRandom(); process.stdout.write('VALIDATOR_MNEMONIC=' + v.mnemonic.phrase + '\n'); process.stdout.write('FAUCET_PRIVATE_KEY=' + f.privateKey + '\n'); process.stdout.write('FAUCET_ADDRESS=' + f.address.toLowerCase() + '\n');"
+
   wallet_output="$(docker run --rm node:20-alpine sh -c "
     set -e
     npm install --silent --no-save ethers@6 2>/dev/null
-    node --input-type=module <<'NODE'
-import { Wallet } from 'ethers';
-const validator = Wallet.createRandom();
-const faucet = Wallet.createRandom();
-process.stdout.write('VALIDATOR_MNEMONIC=' + validator.mnemonic.phrase + '\n');
-process.stdout.write('FAUCET_PRIVATE_KEY=' + faucet.privateKey + '\n');
-process.stdout.write('FAUCET_ADDRESS=' + faucet.address.toLowerCase() + '\n');
-NODE
+    echo \"${JS_SCRIPT}\" > /tmp/gen.mjs
+    node /tmp/gen.mjs
   ")"
 
   MNEMONIC="$(printf '%s\n' "$wallet_output" | grep '^VALIDATOR_MNEMONIC=' | cut -d= -f2-)"
