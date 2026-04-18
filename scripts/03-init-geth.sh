@@ -20,7 +20,7 @@ docker run --rm \
   --user "$(id -u):$(id -g)" \
   -v "$DATADIR:/data" \
   -v "$GENESIS:/genesis.json:ro" \
-  ethereum/client-go \
+  ethereum/client-go:v1.14.12 \
   init --datadir /data /genesis.json
 
 echo "OK  Geth initialized."

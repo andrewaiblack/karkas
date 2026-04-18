@@ -59,6 +59,7 @@ services:
       ETHEREUM_JSONRPC_VARIANT: "geth"
       ETHEREUM_JSONRPC_HTTP_URL: "http://host.docker.internal:${EXECUTION_HTTP_PORT:-8545}/"
       ETHEREUM_JSONRPC_TRACE_URL: "http://host.docker.internal:${EXECUTION_HTTP_PORT:-8545}/"
+      ETHEREUM_JSONRPC_WS_URL: "ws://host.docker.internal:${EXECUTION_WS_PORT:-8546}/"
       ETHEREUM_JSONRPC_TRANSPORT: "http"
       ETHEREUM_JSONRPC_DISABLE_ARCHIVE_BALANCES: "false"
       ECTO_USE_SSL: "false"

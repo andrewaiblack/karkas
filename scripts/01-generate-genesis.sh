@@ -3,6 +3,13 @@
 #  01-generate-genesis.sh
 #  Renders config templates from .env + network.config, then runs the
 #  ethereum-genesis-generator docker image to produce all genesis artifacts.
+#
+#  FIXES APPLIED:
+#  1. CHAIN_ID passed via -e to docker run (genesis generator reads env var)
+#  2. chain_id: added to el/genesis-config.yaml render
+#  3. Prague/Osaka stripped from genesis.json BEFORE CL genesis generation
+#     so Geth 1.14.x computes the same block hash as Lighthouse
+#  4. Genesis generated in two steps: el -> strip -> cl
 # =============================================================================
 set -euo pipefail
 
@@ -24,16 +31,12 @@ load_env() {
   local file="$1"
   [[ -f "$file" ]] || return
   while IFS= read -r line; do
-    # skip comments and empty lines
     [[ "$line" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${line// }" ]] && continue
-    # strip export prefix if present
     line="${line#export }"
-    # only process KEY=VALUE lines
     [[ "$line" == *=* ]] || continue
     local key="${line%%=*}"
     local val="${line#*=}"
-    # strip surrounding quotes
     val="${val%\"}"
     val="${val#\"}"
     export "$key=$val" 2>/dev/null || true
@@ -49,7 +52,6 @@ load_env "$ENV_FILE"
 [[ -z "${CHAIN_ID:-}" ]]           && die "CHAIN_ID not set in network.config."
 
 # ── render config templates ───────────────────────────────────────────────────
-# We keep the originals as templates and render fresh each time.
 
 rm -rf "$RENDERED"
 cp -r "$TEMPLATES" "$RENDERED"
@@ -70,16 +72,16 @@ cat > "$RENDERED/cl/mnemonics.yaml" << YAML
   status: 0
 YAML
 
-# Render el/genesis-config.yaml with the actual faucet address
+# Render el/genesis-config.yaml — chain_id must be here AND in docker -e
 FAUCET_PREMINE_AMOUNT="${FAUCET_PREMINE_AMOUNT:-1000000ETH}"
 cat > "$RENDERED/el/genesis-config.yaml" << YAML
+chain_id: ${CHAIN_ID}
 el_premine_addrs:
   "${FAUCET_ADDRESS}":
     balance: "${FAUCET_PREMINE_AMOUNT}"
 YAML
 
-# Render cl/config.yaml — replace all $VAR placeholders
-# Export all needed vars so envsubst can find them
+# Render cl/config.yaml
 export PRESET_BASE="${PRESET_BASE:-mainnet}"
 export TERMINAL_TOTAL_DIFFICULTY="${TERMINAL_TOTAL_DIFFICULTY:-0}"
 export GENESIS_FORK_VERSION="${GENESIS_FORK_VERSION:-0x10000000}"
@@ -134,16 +136,13 @@ export DEPOSIT_CONTRACT_ADDRESS="${DEPOSIT_CONTRACT_ADDRESS:-}"
 GENESIS_TIMESTAMP=$(( $(date +%s) + ${GENESIS_DELAY:-60} ))
 export GENESIS_TIMESTAMP
 
-# Use envsubst to substitute $VAR placeholders in config.yaml template
 envsubst < "$ROOT/config/cl/config.yaml" > "$RENDERED/cl/config.yaml"
 
-# ── prepare output dirs owned by current user BEFORE docker run ───────────────
-# This prevents Docker (running as root) from creating root-owned subdirs.
+# ── prepare output dirs ───────────────────────────────────────────────────────
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR/metadata" "$OUT_DIR/jwt" "$OUT_DIR/parsed"
 
-# Write JWT secret NOW (before docker), so the file is owned by current user.
 JWT_SECRET="$(grep '^JWT_SECRET=' "$ENV_FILE" | cut -d= -f2-)"
 if [[ -n "$JWT_SECRET" ]]; then
   printf '%s' "0x${JWT_SECRET#0x}" > "$OUT_DIR/jwt/jwtsecret"
@@ -156,14 +155,35 @@ fi
 
 echo "Generating genesis (GENESIS_TIMESTAMP=$GENESIS_TIMESTAMP, CHAIN_ID=$CHAIN_ID)..."
 
-# --user ensures all files written by the container belong to the current user
-docker run --rm \
-  --user "$(id -u):$(id -g)" \
-  -v "$OUT_DIR:/data" \
-  -v "$RENDERED:/config" \
-  -e "GENESIS_TIMESTAMP=$GENESIS_TIMESTAMP" \
-  ethpandaops/ethereum-genesis-generator:master \
-  all
+DOCKER_BASE="docker run --rm
+  --user $(id -u):$(id -g)
+  -v $OUT_DIR:/data
+  -v $RENDERED:/config
+  -e GENESIS_TIMESTAMP=$GENESIS_TIMESTAMP
+  -e CHAIN_ID=$CHAIN_ID
+  ethpandaops/ethereum-genesis-generator:master"
+
+# Step 1: EL genesis (genesis.json) — will contain pragueTime/osakaTime
+$DOCKER_BASE el
+
+# Step 2: Strip Prague/Osaka BEFORE CL genesis reads genesis.json.
+# Geth v1.14.x ignores unknown forks when hashing, so without this strip
+# Geth and Lighthouse compute different genesis block hashes and the chain
+# never starts (Forkchoice requested unknown head).
+python3 - "$OUT_DIR/metadata/genesis.json" << 'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    d = json.load(f)
+removed = [k for k in ['pragueTime', 'osakaTime'] if d['config'].pop(k, None) is not None]
+with open(path, 'w') as f:
+    json.dump(d, f, indent=2)
+if removed:
+    print(f"  OK Stripped {', '.join(removed)} from genesis.json")
+PYEOF
+
+# Step 3: CL genesis (genesis.ssz) — uses the stripped genesis.json
+$DOCKER_BASE cl
 
 echo ""
 echo "Genesis artifacts written to $OUT_DIR"

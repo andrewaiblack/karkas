@@ -25,4 +25,6 @@ exec lighthouse bn \
   --metrics \
   --metrics-address 0.0.0.0 \
   --metrics-port "${CONSENSUS_METRICS_PORT}" \
+  --allow-insecure-genesis-sync \
+  --genesis-backfill \
   ${BOOTSTRAP_ARG}
