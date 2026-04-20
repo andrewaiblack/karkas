@@ -9,111 +9,60 @@ const NETWORK = {
   faucetUrl: "https://faucet.marakyja.xyz",
 };
 
-/* ── Particle canvas background ────────────────────────── */
 function ParticleCanvas() {
   const canvasRef = useRef(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     let animId;
-
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     resize();
     window.addEventListener("resize", resize);
-
     const COUNT = 55;
     const particles = Array.from({ length: COUNT }, () => ({
-      x:    Math.random() * window.innerWidth,
-      y:    Math.random() * window.innerHeight,
-      r:    Math.random() * 1.4 + 0.3,
-      vx:   (Math.random() - 0.5) * 0.18,
-      vy:   (Math.random() - 0.5) * 0.18,
-      // 0 = blue node, 1 = gold diamond
-      type: Math.random() > 0.72 ? 1 : 0,
-      alpha: Math.random() * 0.5 + 0.15,
-      pulse: Math.random() * Math.PI * 2,
+      x: Math.random() * window.innerWidth, y: Math.random() * window.innerHeight,
+      r: Math.random() * 1.4 + 0.3, vx: (Math.random() - 0.5) * 0.18, vy: (Math.random() - 0.5) * 0.18,
+      type: Math.random() > 0.72 ? 1 : 0, alpha: Math.random() * 0.5 + 0.15, pulse: Math.random() * Math.PI * 2,
     }));
-
     const LINK_DIST = 140;
-
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       const t = Date.now() * 0.001;
-
-      // Update positions
       particles.forEach(p => {
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < -20) p.x = canvas.width  + 20;
-        if (p.x > canvas.width  + 20) p.x = -20;
-        if (p.y < -20) p.y = canvas.height + 20;
-        if (p.y > canvas.height + 20) p.y = -20;
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < -20) p.x = canvas.width + 20; if (p.x > canvas.width + 20) p.x = -20;
+        if (p.y < -20) p.y = canvas.height + 20; if (p.y > canvas.height + 20) p.y = -20;
       });
-
-      // Draw links
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const a = particles[i], b = particles[j];
-          const dx = a.x - b.x, dy = a.y - b.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+          const dx = a.x - b.x, dy = a.y - b.y, dist = Math.sqrt(dx*dx + dy*dy);
           if (dist < LINK_DIST) {
             const fade = 1 - dist / LINK_DIST;
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            // gold link if both are gold, else blue
-            const isGold = a.type === 1 && b.type === 1;
-            ctx.strokeStyle = isGold
-              ? `rgba(247,221,125,${fade * 0.18})`
-              : `rgba(66,122,181,${fade * 0.22})`;
-            ctx.lineWidth = 0.8;
-            ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = (a.type===1&&b.type===1) ? `rgba(247,221,125,${fade*0.18})` : `rgba(66,122,181,${fade*0.22})`;
+            ctx.lineWidth = 0.8; ctx.stroke();
           }
         }
       }
-
-      // Draw nodes
       particles.forEach(p => {
-        const pulse = 0.7 + 0.3 * Math.sin(t * 1.2 + p.pulse);
-        const alpha = p.alpha * pulse;
-
+        const alpha = p.alpha * (0.7 + 0.3 * Math.sin(t * 1.2 + p.pulse));
         if (p.type === 1) {
-          // Gold diamond
-          const s = p.r * 3.5;
-          ctx.save();
-          ctx.translate(p.x, p.y);
-          ctx.rotate(Math.PI / 4);
-          ctx.fillStyle = `rgba(247,221,125,${alpha * 0.85})`;
-          ctx.fillRect(-s / 2, -s / 2, s, s);
-          ctx.restore();
+          const s = p.r * 3.5; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(Math.PI/4);
+          ctx.fillStyle = `rgba(247,221,125,${alpha*0.85})`; ctx.fillRect(-s/2,-s/2,s,s); ctx.restore();
         } else {
-          // Blue circle
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.r * (1 + 0.3 * Math.sin(t + p.pulse)), 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(91,155,213,${alpha})`;
-          ctx.fill();
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r*(1+0.3*Math.sin(t+p.pulse)), 0, Math.PI*2);
+          ctx.fillStyle = `rgba(91,155,213,${alpha})`; ctx.fill();
         }
       });
-
       animId = requestAnimationFrame(draw);
     };
-
     draw();
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener("resize", resize);
-    };
+    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
   }, []);
-
   return <canvas ref={canvasRef} id="particle-canvas" />;
 }
 
-/* ── MetaMask full SVG ──────────────────────────────────── */
 function MetaMaskIcon({ size = 20 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 318.6 318.6" xmlns="http://www.w3.org/2000/svg">
@@ -150,7 +99,6 @@ function MetaMaskIcon({ size = 20 }) {
   );
 }
 
-/* ── Brand Logo ─────────────────────────────────────────── */
 function KarkasLogo({ size = 40 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -175,17 +123,15 @@ function KarkasLogo({ size = 40 }) {
   );
 }
 
-/* ── Stat Card ──────────────────────────────────────────── */
-function StatCard({ label, value, mono }) {
+function StatCard({ label, value }) {
   return (
     <div className="card-hover rounded-2xl border border-white/8 bg-white/3 backdrop-blur-sm px-6 py-5">
       <p className="text-xs font-medium uppercase tracking-widest text-blue-DEFAULT/70 mb-2">{label}</p>
-      <p className={`text-lg font-semibold text-white/90 break-all ${mono ? "font-mono text-sm" : ""}`}>{value}</p>
+      <p className="text-lg font-semibold text-white/90 break-all">{value}</p>
     </div>
   );
 }
 
-/* ── Feature Card ───────────────────────────────────────── */
 function FeatureCard({ icon, title, body, delay }) {
   return (
     <div className="card-hover fade-up-3 rounded-2xl border border-white/8 bg-white/3 backdrop-blur-sm p-6" style={{ animationDelay: `${delay}s` }}>
@@ -198,7 +144,6 @@ function FeatureCard({ icon, title, body, delay }) {
   );
 }
 
-/* ── Main App ───────────────────────────────────────────── */
 export default function App() {
   const handleAddNetwork = async () => {
     if (!window.ethereum) return;
@@ -218,14 +163,13 @@ export default function App() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-navy noise">
-      {/* Aurora + particles */}
       <div className="aurora-bg" />
       <ParticleCanvas />
       <div className="scanline" />
 
       <div className="relative z-10 mx-auto max-w-6xl px-6 py-10 flex flex-col gap-20">
 
-        {/* ── Header ─────────────────────────────────────── */}
+        {/* Header — без MetaMask кнопки */}
         <header className="fade-up flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="glow-blue rounded-xl border border-blue-DEFAULT/30 bg-blue-DEFAULT/10 p-2">
@@ -248,43 +192,31 @@ export default function App() {
                 {label}
               </a>
             ))}
-            <button onClick={handleAddNetwork}
-              className="ml-2 px-4 py-2 text-sm font-semibold rounded-full
-                bg-gold-DEFAULT text-navy font-display tracking-wide
-                hover:bg-gold-light transition-all duration-200 glow-gold flex items-center gap-2">
-              <MetaMaskIcon size={16} />
-              + MetaMask
-            </button>
           </nav>
         </header>
 
-        {/* ── Hero ───────────────────────────────────────── */}
+        {/* Hero */}
         <section className="grid gap-12 md:grid-cols-[1.15fr_0.85fr] items-center">
           <div className="space-y-7 fade-up-2">
             <div className="inline-flex items-center gap-2 rounded-full border border-blue-DEFAULT/30 bg-blue-DEFAULT/10 px-4 py-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-gold-DEFAULT animate-pulse" />
               <span className="text-xs font-medium tracking-widest uppercase text-blue-DEFAULT">Chain ID {NETWORK.chainId}</span>
             </div>
-
             <h2 className="font-display text-5xl md:text-6xl font-bold leading-[1.05] tracking-tight text-white">
-              Built for rapid
-              <br />
-              <span style={{ color: "#F7DD7D" }}>iteration</span> and
-              <br />
+              Built for rapid<br />
+              <span style={{ color: "#F7DD7D" }}>iteration</span> and<br />
               resilient validation.
             </h2>
-
             <p className="text-lg text-white/60 leading-relaxed max-w-lg">
               KARKAS is a focused L1 testnet for shipping fast, testing new ideas,
               and moving value with confidence. Spin up RPC access, grab KRKS,
               and explore blocks in minutes.
             </p>
-
+            {/* Одна кнопка Get KRKS + одна Add to MetaMask */}
             <div className="flex flex-wrap gap-3 pt-2">
               <a href={NETWORK.faucetUrl} target="_blank" rel="noopener noreferrer"
                 className="rounded-full px-6 py-3 text-sm font-display font-semibold tracking-wide
-                  bg-blue-DEFAULT text-white hover:bg-blue-deep
-                  transition-all duration-200 glow-blue">
+                  bg-blue-DEFAULT text-white hover:bg-blue-deep transition-all duration-200 glow-blue">
                 Get KRKS →
               </a>
               <button onClick={handleAddNetwork}
@@ -297,7 +229,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Network info card */}
+          {/* Network info card — без кнопки внизу */}
           <div className="fade-up-2 rounded-3xl border border-blue-DEFAULT/25 bg-white/3 backdrop-blur-sm p-7 glow-blue">
             <div className="flex items-start justify-between mb-6">
               <div>
@@ -308,9 +240,7 @@ export default function App() {
                 <KarkasLogo size={28} />
               </div>
             </div>
-
             <div className="section-line mb-6" />
-
             <div className="space-y-4">
               {[
                 { label: "RPC URL",  val: NETWORK.rpcUrl },
@@ -324,24 +254,12 @@ export default function App() {
                 </div>
               ))}
             </div>
-
-            <div className="section-line mt-6 mb-5" />
-
-            <button onClick={handleAddNetwork}
-              className="w-full flex items-center justify-center gap-2.5 rounded-xl
-                border border-gold-DEFAULT/35 bg-gold-DEFAULT/8 py-3
-                text-sm font-display font-semibold text-gold-DEFAULT
-                hover:bg-gold-DEFAULT/15 transition-all duration-200">
-              <MetaMaskIcon size={20} />
-              Add KARKAS to MetaMask
-            </button>
           </div>
         </section>
 
-        {/* ── Divider ──────────────────────────────────── */}
         <div className="section-line" />
 
-        {/* ── Features ─────────────────────────────────── */}
+        {/* Features */}
         <section className="space-y-8 fade-up-3">
           <div className="flex items-center gap-3">
             <span className="w-5 h-px bg-gold-DEFAULT/60" />
@@ -366,7 +284,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* ── Stats bar ─────────────────────────────────── */}
+        {/* Stats */}
         <section className="fade-up-4 grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Chain ID"   value={NETWORK.chainId} />
           <StatCard label="Symbol"     value={NETWORK.symbol} />
@@ -374,14 +292,14 @@ export default function App() {
           <StatCard label="Faucet/day" value="1 KRKS" />
         </section>
 
-        {/* ── Footer ───────────────────────────────────── */}
-        <footer className="fade-up-4 section-line pt-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        {/* Footer — вирівняний */}
+        <footer className="fade-up-4 section-line pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <KarkasLogo size={24} />
             <span className="font-display text-sm font-semibold text-white/60">KARKAS Network</span>
           </div>
-          <p className="text-xs text-white/35">
-            Chain ID {NETWORK.chainId} · {NETWORK.symbol} · Run the faucet, explorer, and RPC from your KARKAS stack.
+          <p className="text-xs text-white/35 text-center md:text-right">
+            Chain ID {NETWORK.chainId} · {NETWORK.symbol} · Faucet, explorer and RPC powered by your KARKAS stack.
           </p>
         </footer>
       </div>
