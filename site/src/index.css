@@ -1,62 +1,81 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
+@import url("https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500,600,700&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  --primary-blue: #427AB5;
+  --deep-blue: #406AAF;
+  --gold: #F7DD7D;
+  --cream: #FFE8BE;
+  --dark-navy: #0C101B;
   color-scheme: dark;
 }
+
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Space Grotesk", system-ui, sans-serif;
-  background:
-    radial-gradient(1200px 600px at 10% 10%, rgba(255, 107, 61, 0.2), transparent 60%),
-    radial-gradient(800px 600px at 90% 20%, rgba(255, 179, 124, 0.18), transparent 55%),
-    radial-gradient(900px 700px at 50% 100%, rgba(120, 120, 255, 0.1), transparent 60%),
-    #0b0f14;
-  color: #f4f4f5;
+  font-family: "Public Sans", system-ui, sans-serif;
+  background: var(--dark-navy);
+  color: #e8edf8;
 }
 
-.grid-sheen {
+h1, h2, h3, h4 {
+  font-family: "Clash Grotesk", "Public Sans", system-ui, sans-serif;
+}
+
+.grid-bg {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(circle at top, black, transparent 70%);
+    linear-gradient(rgba(66,122,181,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(66,122,181,0.06) 1px, transparent 1px);
+  background-size: 64px 64px;
 }
 
-.fade-up {
-  animation: fadeUp 0.8s ease both;
-}
-
-.fade-up-delay {
-  animation: fadeUp 0.8s ease both;
-  animation-delay: 0.15s;
-}
+.fade-up   { animation: fadeUp 0.9s cubic-bezier(0.22,0.61,0.36,1) both; }
+.fade-up-2 { animation: fadeUp 0.9s cubic-bezier(0.22,0.61,0.36,1) 0.15s both; }
+.fade-up-3 { animation: fadeUp 0.9s cubic-bezier(0.22,0.61,0.36,1) 0.3s both; }
+.fade-up-4 { animation: fadeUp 0.9s cubic-bezier(0.22,0.61,0.36,1) 0.45s both; }
 
 @keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.float {
-  animation: float 7s ease-in-out infinite;
+.logo-circle { animation: pulse-ring 3s ease-in-out infinite; }
+@keyframes pulse-ring {
+  0%,100% { opacity:0.7; r:22; }
+  50%      { opacity:1;   r:24; }
 }
 
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-14px);
-  }
+.card-hover {
+  transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
 }
+.card-hover:hover {
+  border-color: rgba(66,122,181,0.45);
+  box-shadow: 0 8px 40px rgba(66,122,181,0.12);
+  transform: translateY(-3px);
+}
+
+.section-line {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(66,122,181,0.35), rgba(247,221,125,0.2), transparent);
+}
+
+.nav-link {
+  position: relative;
+  transition: color 0.2s;
+}
+.nav-link::after {
+  content:''; position:absolute; bottom:-3px; left:0;
+  width:0; height:1px; background:var(--gold);
+  transition: width 0.3s;
+}
+.nav-link:hover::after { width:100%; }
+.nav-link:hover { color: var(--gold); }
+
+.glow-gold { box-shadow: 0 0 28px rgba(247,221,125,0.2); }
+.glow-blue { box-shadow: 0 0 40px rgba(66,122,181,0.25); }

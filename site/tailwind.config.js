@@ -4,17 +4,20 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ["\"Space Grotesk\"", "system-ui", "sans-serif"],
-        mono: ["\"IBM Plex Mono\"", "ui-monospace", "SFMono-Regular", "monospace"],
+        display: ['"Clash Grotesk"', '"Public Sans"', "system-ui", "sans-serif"],
+        body: ['"Public Sans"', "system-ui", "sans-serif"],
+        mono: ['"Public Sans"', "ui-monospace", "monospace"],
       },
       colors: {
-        ink: "#0b0f14",
-        ember: "#ff6b3d",
-        copper: "#ffb37c",
-        haze: "#f4f4f5",
+        navy: "#0C101B",
+        "navy-mid": "#111827",
+        "navy-light": "#1a2438",
+        blue: { DEFAULT: "#427AB5", deep: "#406AAF" },
+        gold: { DEFAULT: "#F7DD7D", light: "#FFE8BE" },
       },
       boxShadow: {
-        glow: "0 0 35px rgba(255, 107, 61, 0.35)",
+        "glow-blue": "0 0 40px rgba(66,122,181,0.3)",
+        "glow-gold":  "0 0 28px rgba(247,221,125,0.25)",
       },
     },
   },

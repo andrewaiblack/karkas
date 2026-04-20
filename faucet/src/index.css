@@ -1,7 +1,123 @@
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700&display=swap");
+@import url("https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500,600,700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+:root {
+  --primary-blue: #427AB5;
+  --deep-blue: #406AAF;
+  --gold: #F7DD7D;
+  --cream: #FFE8BE;
+  --dark-navy: #0C101B;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Public Sans", system-ui, sans-serif;
+  background: var(--dark-navy);
+  color: #e8edf8;
+}
+
+h1, h2, h3 {
+  font-family: "Clash Grotesk", "Public Sans", system-ui, sans-serif;
+}
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(66,122,181,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(66,122,181,0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.fade-up   { animation: fadeUp 0.8s cubic-bezier(0.22,0.61,0.36,1) both; }
+.fade-up-2 { animation: fadeUp 0.8s cubic-bezier(0.22,0.61,0.36,1) 0.12s both; }
+.fade-up-3 { animation: fadeUp 0.8s cubic-bezier(0.22,0.61,0.36,1) 0.24s both; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.glow-blue { box-shadow: 0 0 40px rgba(66,122,181,0.2); }
+.glow-gold  { box-shadow: 0 0 24px rgba(247,221,125,0.18); }
+
+.section-line {
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(66,122,181,0.3), rgba(247,221,125,0.15), transparent);
+}
+
+.input-field {
+  width: 100%;
+  background: rgba(12,16,27,0.8);
+  border: 1px solid rgba(66,122,181,0.25);
+  color: #e8edf8;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 0.875rem;
+  font-family: "Public Sans", monospace;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.input-field::placeholder { color: rgba(232,237,248,0.3); }
+.input-field:focus {
+  border-color: rgba(66,122,181,0.6);
+  box-shadow: 0 0 0 3px rgba(66,122,181,0.12);
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  font-family: "Clash Grotesk", sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  background: #427AB5;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #406AAF;
+  box-shadow: 0 0 32px rgba(66,122,181,0.35);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-metamask {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  font-family: "Clash Grotesk", sans-serif;
+  font-weight: 600;
+  font-size: 0.875rem;
+  background: rgba(247,221,125,0.08);
+  border: 1px solid rgba(247,221,125,0.3);
+  color: #F7DD7D;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-metamask:hover:not(:disabled) {
+  background: rgba(247,221,125,0.14);
+  border-color: rgba(247,221,125,0.5);
+}
+.btn-metamask:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
