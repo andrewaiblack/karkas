@@ -94,6 +94,7 @@ if [[ "$needs_wallet" == "true" ]]; then
 
   wallet_output="$(docker run --rm node:20-alpine sh -c "
     set -e
+    cd /tmp
     npm install --silent --no-save ethers@6 2>/dev/null
     echo \"${JS_SCRIPT}\" > /tmp/gen.mjs
     node /tmp/gen.mjs
