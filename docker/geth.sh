@@ -37,4 +37,9 @@ exec geth \
   --syncmode full \
   --metrics \
   --metrics.addr 0.0.0.0 \
+  --miner.gasprice "${MIN_GAS_PRICE:-1000000000}" \
+  --txpool.pricelimit "${MIN_GAS_PRICE:-1000000000}" \
+  --txpool.globalslots "${TXPOOL_GLOBAL_SLOTS:-4096}" \
+  --txpool.accountslots "${TXPOOL_ACCOUNT_SLOTS:-16}" \
+  --txpool.globalqueue "${TXPOOL_GLOBAL_QUEUE:-1024}" \
   ${BOOTNODES_ARG}
