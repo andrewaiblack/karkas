@@ -1,0 +1,14 @@
+{
+  "name": "krks-vrf-oracle",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "oracle.js",
+  "scripts": {
+    "start": "node oracle.js",
+    "dev":   "node --watch oracle.js"
+  },
+  "dependencies": {
+    "ethers": "^6.16.0",
+    "dotenv": "^16.4.5"
+  }
+}
