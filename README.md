@@ -1,77 +1,140 @@
-# PoS EVM L1 Testnet (Geth + Lighthouse)
+# KARKAS Testnet — повний стек
 
-Full Proof-of-Stake EVM testnet — Execution Layer = Geth, Consensus/Validator = Lighthouse.
+PoS EVM L1 + React DApp сайт (Landing / DApps / KRKS Roulette) + VRF Oracle
 
-## Quick Start
-
-### 1. Edit `network.config`
-
-Open `network.config` and adjust the settings you need:
+## Архітектура
 
 ```
-NETWORK_NAME=karkas        # name shown in Blockscout / config
-CHAIN_ID=144411            # EVM chain ID (pick something unique)
-CURRENCY_SYMBOL=KRKS       # token symbol
-BASE_DOMAIN=localhost      # your domain (or localhost for local use)
-RPC_URL=http://localhost:8545
-EXPLORER_URL=http://localhost:4000
-
-# Ports
-EXECUTION_HTTP_PORT=8545
-EXECUTION_WS_PORT=8546
-FAUCET_PORT=5000
-...
+network.config          ← єдине джерело конфігурації
+  ↓
+00-init-secrets.sh      ← генерує секрети, пише .env
+  ↓
+.env                    ← вся конфігурація + секрети (gitignored)
+  ↓
+docker-compose.yml
+  ├── execution         (Geth)
+  ├── consensus         (Lighthouse beacon)
+  ├── validator         (Lighthouse VC)
+  ├── faucet            (Express + React)
+  ├── landing           (React SPA — nginx, порт 3000)
+  │     ├── /           — лендінг
+  │     ├── /dapps      — список DApps
+  │     └── /dapps/gembl — KRKS Roulette
+  └── oracle            (VRF Oracle для рулетки)
 ```
 
-That file is the **only** place you configure the network. Everything else reads from it.
+---
 
-### 2. Generate all secrets
+## Швидкий старт
+
+### 1. Налаштувати мережу
+
+```bash
+# Відредагуй network.config (назва, chain ID, домен, порти)
+nano network.config
+```
+
+### 2. Генерація секретів
 
 ```bash
 bash scripts/00-init-secrets.sh
 ```
 
-This generates and saves to `.env` (gitignored):
-- Validator BIP-39 mnemonic
-- Faucet private key + Ethereum address
-- JWT secret (for EL ↔ CL authentication)
-- Blockscout DB password + secret key base
-
-Safe to re-run — existing values are never overwritten.
-
-### 3. Generate genesis
+### 3. Генерація Genesis
 
 ```bash
 bash scripts/01-generate-genesis.sh
 ```
 
-Renders config templates with your values, then runs `ethereum-genesis-generator` to produce all artifacts in `artifacts/`.
-
-### 4. Generate validator keys
+### 4. Генерація ключів валідатора
 
 ```bash
 bash scripts/02-generate-keys.sh
 ```
 
-### 5. Initialise Geth
+### 5. Ініціалізація Geth
 
 ```bash
 bash scripts/03-init-geth.sh
 ```
 
-### 6. Copy validator keys
+### 6. Копіювання ключів валідатора
 
 ```bash
 bash scripts/04-init-validator.sh
 ```
 
-### 7. Start the stack
+### 7. Запуск стеку
 
 ```bash
 docker compose up -d
 ```
 
-### 8. Start Blockscout (optional)
+Перевірити логи:
+```bash
+docker compose logs -f landing   # сайт
+docker compose logs -f oracle    # VRF oracle
+docker compose logs -f faucet    # фасет
+```
+
+---
+
+## Деплой рулетки
+
+### A. Налаштувати oracle/.env
+
+```bash
+cp oracle/.env.example oracle/.env
+nano oracle/.env
+# ORACLE_PRIVATE_KEY — свіжий приватний ключ (не власницький!)
+# Згенерувати: node -e "const {ethers}=require('ethers'); console.log(ethers.Wallet.createRandom().privateKey)"
+```
+
+### B. Задеплоїти контракт
+
+```bash
+cd site   # або з кореня
+OWNER_PRIVATE_KEY=0x...  \
+ORACLE_ADDRESS=<адреса з oracle/.env>  \
+SEED_KRKS=50             \
+node contracts/deploy.js
+```
+
+Скрипт виведе адресу контракту.
+
+### C. Прописати адресу
+
+**1. `site/src/config/network.js`:**
+```js
+export const ROULETTE_ADDRESS = "0xYourDeployedAddress";
+```
+
+**2. `oracle/.env`:**
+```
+CONTRACT_ADDRESS=0xYourDeployedAddress
+```
+
+### D. Перебудувати і перезапустити
+
+```bash
+docker compose build landing oracle
+docker compose up -d landing oracle
+```
+
+Рулетка буде доступна на `/dapps/gembl`.
+
+---
+
+## Чому сайт не піднімався (вирішено)
+
+**Проблема:** nginx був налаштований як `try_files $uri /index.html` — без `$uri/`.
+React Router для шляхів `/dapps` і `/dapps/gembl` отримував 404 від nginx замість `index.html`.
+
+**Виправлення:** `try_files $uri $uri/ /index.html;`
+
+---
+
+## Blockscout (опційно)
 
 ```bash
 cd blockscout
@@ -80,44 +143,10 @@ docker compose --env-file ../.env up -d
 
 ---
 
-## Architecture
+## Зупинка
 
+```bash
+bash scripts/shutdown.sh
+# або
+docker compose down
 ```
-network.config          ← single source of truth for all settings
-  ↓
-00-init-secrets.sh      ← generates secrets, writes .env
-  ↓
-.env                    ← all config + secrets (gitignored)
-  ↓
-docker-compose.yml      ← reads .env only, no hardcoding
-blockscout/docker-compose.yml ← reads root .env via --env-file
-```
-
-## Adding More Validators
-
-1. Edit `NUMBER_OF_VALIDATORS` in `network.config`.
-2. Re-run secrets (idempotent), re-generate genesis, re-generate keys, restart.
-
-## Multi-Machine Setup
-
-1. On the seed server: start the stack, grab `enode://...` and `enr:...` from logs:
-   ```bash
-   docker logs l1-execution | grep enode
-   docker logs l1-consensus | grep enr
-   ```
-2. On the second machine: copy `artifacts/metadata/` from the seed.
-3. Add to `.env` on the second machine:
-   ```
-   EL_BOOTNODES=enode://...
-   CL_BOOTSTRAP_NODES=enr:...
-   ```
-4. Run steps 4–7 on the second machine.
-
-## Security Notes
-
-- `.env` is chmod 600 and gitignored — never commit it.
-- The Consensus API port and metrics port are bound to `127.0.0.1` in docker-compose (not exposed publicly).
-- The faucet validates private key format at startup and never exposes error internals in production.
-- Blockscout DB password and `SECRET_KEY_BASE` are randomly generated per-deployment.
-
-Server deployment guide (Cloudflare Tunnel, reverse proxy): see `DEPLOY_SERVER.md`.
